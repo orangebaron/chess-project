@@ -26,7 +26,7 @@ struct Move {
 };
 
 bool Piece::canMoveTo(Coordinate newLoc,Piece pieces[numPieces]) { //EN PASSANT? CASTLING?
-  #define checkEveryPiece(cond) for (int i=0; i<numPieces; i++) { Piece& p = pieces[i]; if (&p!=this && p.alive && cond) return false; }
+  #define checkEveryPiece(cond) for (char i=0; i<numPieces; i++) { Piece& p = pieces[i]; if (&p!=this && p.alive && cond) return false; }
   #define inRange(a,r1,r2) ((r1>r2) ? (a<=r1&&a>=r2) : (a<=r2&&a>=r1))
 
   checkEveryPiece(p.color==color && p.loc==newLoc);
@@ -59,21 +59,21 @@ bool Piece::canMoveTo(Coordinate newLoc,Piece pieces[numPieces]) { //EN PASSANT?
 
 bool Move::apply(Piece pieces[numPieces], PieceColor& whoseTurn) {
   bool valid = false;
-  for (int i=0; i<numPieces; i++) if (pieces[i].alive && pieces[i].loc==start) valid = pieces[i].color==whoseTurn && pieces[i].canMoveTo(finish,pieces);
+  for (char i=0; i<numPieces; i++) if (pieces[i].alive && pieces[i].loc==start) valid = pieces[i].color==whoseTurn && pieces[i].canMoveTo(finish,pieces);
   if (!valid) return false;
   Piece pieces2[numPieces];
   memcpy(pieces2,pieces,numPieces);
   //find if that puts king in check
   Coordinate kingLoc;
-  for (int i=0; i<numPieces; i++) if (pieces2[i].color==whoseTurn && pieces2[i].type==king) { kingLoc = pieces2[i].loc; break; }
-  for (int i=0; i<numPieces; i++) if (pieces2[i].alive && pieces2[i].color!=whoseTurn && pieces2[i].canMoveTo(kingLoc,pieces2)) return false;
+  for (char i=0; i<numPieces; i++) if (pieces2[i].color==whoseTurn && pieces2[i].type==king) { kingLoc = pieces2[i].loc; break; }
+  for (char i=0; i<numPieces; i++) if (pieces2[i].alive && pieces2[i].color!=whoseTurn && pieces2[i].canMoveTo(kingLoc,pieces2)) return false;
   memcpy(pieces,pieces2,numPieces);
-  whoseTurn = whoseTurn==white?black:white;
+  whoseTurn = whoseTurn==white ? black : white;
 }
 
 void populateBoard(Piece pieces[numPieces]) {
   PieceType backRow[boardSize] { rook, knight, bishop, queen, king, bishop, knight, rook };
-  for (int i=0; i<boardSize; i++) {
+  for (char i=0; i<boardSize; i++) {
     pieces[(4*i)  ]=Piece({i,0}, backRow[i], white);
     pieces[(4*i)+1]=Piece({i,1}, pawn,       white);
     pieces[(4*i)+2]=Piece({i,7}, backRow[i], black);
@@ -82,6 +82,32 @@ void populateBoard(Piece pieces[numPieces]) {
 }
 
 Piece pieces[numPieces];
+
+const int receiveInPin = 0;
+const int receiveOutPin = 0;
+const int validInPin = 0;
+const int validOutPin = 0;
+const char amtDataPins = 3;
+const int dataInPins[amtDataPins] = {0,0,0};
+const int dataOutPins[amtDataPins] = {0,0,0};
+
+char receiveData() {
+  while (!digitalRead(receiveInPin));
+  char data = 0;
+  for (char i=0;i<amtDataPins;i++) { data <<= 1; data+=digitalRead(dataInPins[i]); }
+  digitalWrite(receiveOutPin,HIGH);
+  while (digitalRead(receiveInPin));
+  digitalWrite(receiveOutPin,LOW);
+  return data;
+}
+bool sendData(char data) { //returns whether valid or not
+  for (char i=0;i<amtDataPins;i++) digitalWrite(dataOutPins[i],(data>>i)%2);
+  digitalWrite(receiveOutPin,HIGH);
+  while(!digitalRead(receiveInPin));
+  digitalWrite(receiveOutPin,LOW);
+  while(digitalRead(receiveInPin));
+}
+
 void setup() {
   populateBoard(pieces);
 }

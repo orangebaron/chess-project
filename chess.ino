@@ -28,7 +28,8 @@ struct Move {
 bool Piece::canMoveTo(Coordinate newLoc,Piece pieces[numPieces]) { //EN PASSANT? CASTLING?
   #define checkEveryPiece(cond) for (int i=0; i<numPieces; i++) { Piece& p = pieces[i]; if (&p!=this && p.alive && cond) return false; }
   #define inRange(a,r1,r2) ((r1>r2) ? (a<=r1&&a>=r2) : (a<=r2&&a>=r1))
-  
+
+  checkEveryPiece(p.color==color && p.loc==newLoc);
   Coordinate diff = newLoc-loc;
   Coordinate absDiff = diff.absoluteVal();
   if (type == knight) return (absDiff.x==2 && absDiff.y == 1) || (absDiff.x==1 && absDiff.y == 2);
@@ -58,11 +59,14 @@ bool Piece::canMoveTo(Coordinate newLoc,Piece pieces[numPieces]) { //EN PASSANT?
 
 bool Move::apply(Piece pieces[numPieces], PieceColor& whoseTurn) {
   bool valid = false;
-  for (int i=0; i<numPieces; i++) if (pieces[i].alive && pieces[i].loc==start) valid = pieces[i].canMoveTo(finish,pieces);
+  for (int i=0; i<numPieces; i++) if (pieces[i].alive && pieces[i].loc==start) valid = pieces[i].color==whoseTurn && pieces[i].canMoveTo(finish,pieces);
   if (!valid) return false;
   Piece pieces2[numPieces];
   memcpy(pieces2,pieces,numPieces);
-  
+  //find if that puts king in check
+  Coordinate kingLoc;
+  for (int i=0; i<numPieces; i++) if (pieces2[i].color==whoseTurn && pieces2[i].type==king) { kingLoc = pieces2[i].loc; break; }
+  for (int i=0; i<numPieces; i++) if (pieces2[i].alive && pieces2[i].color!=whoseTurn && pieces2[i].canMoveTo(kingLoc,pieces2)) return false;
   memcpy(pieces,pieces2,numPieces);
   whoseTurn = whoseTurn==white?black:white;
 }

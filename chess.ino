@@ -97,7 +97,7 @@ char receiveData() {
   for (char i=0;i<amtDataPins;i++) { data <<= 1; data+=digitalRead(dataInPins[i]); }
   digitalWrite(receiveOutPin,HIGH);
   while (digitalRead(receiveInPin));
-  digitalWrite(receiveOutPin,LOW);
+  // must do digitalWrite(recieveOutPin,LOW) once you decide whether it's valid or not & output
   return data;
 }
 bool sendData(char data) { //returns whether valid or not
@@ -106,6 +106,7 @@ bool sendData(char data) { //returns whether valid or not
   while(!digitalRead(receiveInPin));
   digitalWrite(receiveOutPin,LOW);
   while(digitalRead(receiveInPin));
+  return digitalRead(validInPin);
 }
 
 void setup() {

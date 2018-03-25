@@ -3,11 +3,11 @@ const int numPieces = boardSize * boardSize / 2;
 
 struct Coordinate {
   char x, y;
-  Coordinate operator-(Coordinate& a) { return Coordinate{x-a.x,y-a.y}; }
+  Coordinate operator-(Coordinate& a) { return Coordinate{(char)(x-a.x),(char)(y-a.y)}; }
   bool operator==(Coordinate& a) { return x==a.x && y==a.y; }
   bool operator!=(Coordinate& a) { return !(*this==a); }
   bool isSquare() { return absoluteVal().x==absoluteVal().y; }
-  Coordinate absoluteVal() { return Coordinate{abs(x),abs(y)}; }
+  Coordinate absoluteVal() { return Coordinate{(char)abs(x),(char)abs(y)}; }
 };
 enum PieceType { pawn, rook, knight, bishop, queen, king };
 enum PieceColor { black, white };

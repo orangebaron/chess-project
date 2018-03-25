@@ -82,6 +82,7 @@ void populateBoard(Piece pieces[numPieces]) {
 }
 
 Piece pieces[numPieces];
+PieceColor whoseTurn = white;
 
 const int receiveInPin = 0;
 const int receiveOutPin = 0;
@@ -100,16 +101,50 @@ char receiveData() {
   // must do digitalWrite(recieveOutPin,LOW) once you decide whether it's valid or not & output
   return data;
 }
+void sendValid(bool valid) {
+  digitalWrite(validOutPin,valid);
+  delay(2);
+  digitalWrite(receiveOutPin,LOW);
+}
+char receiveDataAutoTrue() {
+  char data = receiveData();
+  sendValid(true);
+  return data;
+}
+bool receiveMove(Piece pieces[numPieces],PieceColor& whoseTurn) { //returns whether it was valid
+  char receivedData[4];
+  for (char i=0;i<4;i++) { receivedData[i]=receiveData(); if (i!=3) sendValid(true); }
+  Move m {{receiveDataAutoTrue(),receiveDataAutoTrue()},{receiveDataAutoTrue(),receiveData()}};
+  bool valid = m.apply(pieces,whoseTurn);
+  sendValid(valid);
+  return valid;
+}
 bool sendData(char data) { //returns whether valid or not
   for (char i=0;i<amtDataPins;i++) digitalWrite(dataOutPins[i],(data>>i)%2);
+  delay(2);
   digitalWrite(receiveOutPin,HIGH);
   while(!digitalRead(receiveInPin));
   digitalWrite(receiveOutPin,LOW);
   while(digitalRead(receiveInPin));
   return digitalRead(validInPin);
 }
+bool sendMove(Move& m) {
+  if (!sendData(m.start.x)) return false;
+  if (!sendData(m.start.y)) return false;
+  if (!sendData(m.finish.x)) return false;
+  if (!sendData(m.finish.y)) return false;
+  return true;
+}
 
 void setup() {
   populateBoard(pieces);
 }
-void loop() {}
+void loop() {
+  Move m;
+  do {
+    //TODO: inputs
+  } while (!sendMove(m));
+  //ALSO TODO: outputs
+  m.apply(pieces,whoseTurn);
+  while (!receiveMove(pieces,whoseTurn));
+}

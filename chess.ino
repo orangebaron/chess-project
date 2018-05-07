@@ -81,37 +81,57 @@ void populateBoard(Piece pieces[numPieces]) {
   }
 }
 
+bool readInp(int pin) {
+  for (int i=0; i<5; i++) {
+    digitalWrite(9+i,pin%2);
+    pin/=2;
+  }
+  delay(2);
+  return digitalRead(A2);
+}
+void writeOtp(int pin, bool val) {
+  for (int i=0; i<7; i++) {
+    digitalWrite(2+i,pin%2);
+    pin/=2;
+  }
+  digitalWrite(A1,val);
+  delay(2);
+  digitalWrite(A0,HIGH);
+  delay(2);
+  digitalWrite(A0,LOW);
+}
+
 Piece pieces[numPieces];
 PieceColor whoseTurn = white;
 
 const int receiveInPin = 0;
 const int receiveOutPin = 0;
-const int validInPin = 0;
-const int validOutPin = 0;
+const int validInPin = 1;
+const int validOutPin = 1;
 const char amtDataPins = 3;
-const int dataInPins[amtDataPins] = {0,0,0};
-const int dataOutPins[amtDataPins] = {0,0,0};
+const int dataInPins[amtDataPins] = {2,3,4};
+const int dataOutPins[amtDataPins] = {2,3,4};
 
 char receiveData() {
-  while (!digitalRead(receiveInPin));
+  while (!readInp(receiveInPin));
   char data = 0;
   for (char i=0;i<amtDataPins;i++) { data <<= 1; data+=digitalRead(dataInPins[i]); }
-  digitalWrite(receiveOutPin,HIGH);
-  while (digitalRead(receiveInPin));
+  writeOtp(receiveOutPin,HIGH);
+  while (readInp(receiveInPin));
   // must do digitalWrite(recieveOutPin,LOW) once you decide whether it's valid or not & output
   return data;
 }
 void sendValid(bool valid) {
-  digitalWrite(validOutPin,valid);
+  writeOtp(validOutPin,valid);
   delay(2);
-  digitalWrite(receiveOutPin,LOW);
+  writeOtp(receiveOutPin,LOW);
 }
 char receiveDataAutoTrue() {
   char data = receiveData();
   sendValid(true);
   return data;
 }
-bool receiveMove(Piece pieces[numPieces],PieceColor& whoseTurn) { //returns whether it was valid
+bool receiveMove(Piece pieces[numPieces], PieceColor& whoseTurn) { //returns whether it was valid
   char receivedData[4];
   for (char i=0;i<4;i++) { receivedData[i]=receiveData(); if (i!=3) sendValid(true); }
   Move m {{receiveDataAutoTrue(),receiveDataAutoTrue()},{receiveDataAutoTrue(),receiveData()}};
@@ -120,13 +140,13 @@ bool receiveMove(Piece pieces[numPieces],PieceColor& whoseTurn) { //returns whet
   return valid;
 }
 bool sendData(char data) { //returns whether valid or not
-  for (char i=0;i<amtDataPins;i++) digitalWrite(dataOutPins[i],(data>>i)%2);
+  for (char i=0;i<amtDataPins;i++) writeOtp(dataOutPins[i],(data>>i)%2);
   delay(2);
-  digitalWrite(receiveOutPin,HIGH);
-  while(!digitalRead(receiveInPin));
-  digitalWrite(receiveOutPin,LOW);
-  while(digitalRead(receiveInPin));
-  return digitalRead(validInPin);
+  writeOtp(receiveOutPin,HIGH);
+  while(!readInp(receiveInPin));
+  writeOtp(receiveOutPin,LOW);
+  while(readInp(receiveInPin));
+  return readInp(validInPin);
 }
 bool sendMove(Move& m) {
   if (!sendData(m.start.x)) return false;
@@ -136,15 +156,55 @@ bool sendMove(Move& m) {
   return true;
 }
 
+Move inputMove() {
+  while (!readInp(5));
+  char x1=0,y1=0,x2=0,y2=0;
+  for (char i=0; i<3; i++) {
+    if (readInp(6 +i)) x1 += 1 << i;
+    if (readInp(9 +i)) y1 += 1 << i;
+    if (readInp(12+i)) x2 += 1 << i;
+    if (readInp(15+i)) y2 += 1 << i;
+  }
+  return Move{Coordinate{x1,y1},Coordinate{x2,y2}};
+}
+
+int lastBoard[numPieces] {-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1};
+void updateBoard(Piece pieces[numPieces]) {
+  int board[numPieces];
+  for (int p = 0; p<numPieces; p++) { //WRITE HIGH TO LOCS WITH PIECES ON THEM
+    int loc = (pieces[p].color==white?0:1) + (pieces[p].loc.x*2) + (pieces[p].loc.y * 16) + /*plus starting pin num*/ dataOutPins[amtDataPins-1] + 1;
+    if (loc>=37) loc += 64-37+loc;
+    board[p] = loc;
+    bool found = false;
+    for (int p2 = 0; p2<numPieces; p2++) if (lastBoard[p2]==loc) { found = true; break; }
+    if (!found) writeOtp(loc,HIGH);
+  }
+  for (int p = 0; p<numPieces; p++) { //WRITE LOW TO LOCS WITHOUT PIECES ON THEM
+    bool found = false;
+    int loc = lastBoard[p];
+    for (int p2 = 0; p2<numPieces; p2++) if (board[p2]==loc) { found = true; break; }
+    if (!found) writeOtp(loc,LOW);
+  }
+}
+
 void setup() {
   populateBoard(pieces);
+  Serial.begin(9600);
+  for (Piece* piece=pieces;piece<pieces+numPieces;piece++) {
+    Serial.print((int)piece->loc.x); Serial.print(','); Serial.println((int)piece->loc.y);
+    Serial.println((int)piece->type);
+    Serial.println((int)piece->color);
+  }
+  updateBoard(pieces);
 }
 void loop() {
   Move m;
-  do {
-    //TODO: inputs
-  } while (!sendMove(m));
-  //ALSO TODO: outputs
+  do m = inputMove();
+  while (!sendMove(m));
+  
   m.apply(pieces,whoseTurn);
+  updateBoard(pieces);
+  
   while (!receiveMove(pieces,whoseTurn));
+  updateBoard(pieces);
 }

@@ -36,7 +36,9 @@ bool Piece::canMoveTo(Coordinate newLoc,Piece pieces[numPieces]) { //EN PASSANT?
   if (type == king) return absDiff.x <= 1 && absDiff.y <= 1;
   if (type == pawn) {
     if (color == white ? (loc.y != 1) : (loc.y != 6)) { if (color == white ? (diff.y != 1) : (diff.y != -1)) return false; } //move forward 1 if not in beginning row
-    else return color == white ? (diff.y != 1 && diff.y != 2) : (diff.y != -1 && diff.y != -2); //move forward 1 or 2 if in beginning row
+    else if (color == white ? (diff.y != 1 && diff.y != 2) : (diff.y != -1 && diff.y != -2)) return false; //move forward 1 or 2 if in beginning row
+    if (absDiff.y == 2 && absDiff.x == 1) return false;
+    if (absDiff.y == 2) for (char i=0; i<numPieces; i++) if (pieces[i].loc.x == newLoc.x && pieces[i].loc.y == loc.y+(color == white ? 1 : -1)) return false;
     checkEveryPiece((p.loc == newLoc)&&(absDiff.x != 1 || absDiff.y != 1)); //if attacking move 1 diagonally
     return true;
   }
@@ -58,17 +60,16 @@ bool Piece::canMoveTo(Coordinate newLoc,Piece pieces[numPieces]) { //EN PASSANT?
 }
 
 bool Move::apply(Piece pieces[numPieces], PieceColor& whoseTurn) {
-  bool valid = false;
-  for (char i=0; i<numPieces; i++) if (pieces[i].alive && pieces[i].loc==start) valid = pieces[i].color==whoseTurn && pieces[i].canMoveTo(finish,pieces);
-  if (!valid) return false;
-  Piece pieces2[numPieces];
-  memcpy(pieces2,pieces,numPieces);
-  //find if that puts king in check
-  Coordinate kingLoc;
-  for (char i=0; i<numPieces; i++) if (pieces2[i].color==whoseTurn && pieces2[i].type==king) { kingLoc = pieces2[i].loc; break; }
-  for (char i=0; i<numPieces; i++) if (pieces2[i].alive && pieces2[i].color!=whoseTurn && pieces2[i].canMoveTo(kingLoc,pieces2)) return false;
-  memcpy(pieces,pieces2,numPieces);
-  whoseTurn = whoseTurn==white ? black : white;
+  for (char i=0; i<numPieces; i++) if (pieces[i].alive && pieces[i].loc==finish && pieces[i].color == whoseTurn) return false;
+  for (char i=0; i<numPieces; i++) if (pieces[i].alive && pieces[i].loc==start) {
+	if (pieces[i].color!=whoseTurn) return false;
+	if (!pieces[i].canMoveTo(finish,pieces)) return false;
+	for (char j=0; j<numPieces; j++) if (pieces[j].loc == finish) pieces[j].alive = false;
+	pieces[i].loc = finish;
+  	whoseTurn = whoseTurn==white ? black : white;
+  	return true;
+  }
+  return false;
 }
 
 void populateBoard(Piece pieces[numPieces]) {
